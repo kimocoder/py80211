@@ -21,6 +21,7 @@
 #define __u32	unsigned int
 #define __u16	unsigned short
 #define __u8	unsigned char
+#define __s8	signed char
 #define u64	unsigned long long
 #define _LINUX_TYPES_H
 #define __LINUX_NETLINK_H
