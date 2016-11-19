@@ -41,10 +41,10 @@ def extract_prepare():
 	gitdir = os.path.join(args.srcdir, '.git')
 	if not os.path.exists(os.path.join(args.srcdir, '.git')):
 		sys.stderr.write('warning: could not find git revision info in source tree\n')
-		git_commit = 'unknown'
+		revinfo = 'unknown'
 	else:
-		git_commit = subprocess.check_output(['git', '--git-dir=%s' % gitdir, 'log', '-1', '--oneline'])
-		sys.stdout.write('source tree on commit %s\n' % git_commit)
+		revinfo = subprocess.check_output(['git', '--git-dir=%s' % gitdir, 'describe'])
+		sys.stdout.write('source tree on revision %s\n' % revinfo)
 
 	if not os.path.exists(os.path.join(args.srcdir, hdrpath)):
 		sys.stderr.write('error: provided source tree does contain \'%s\'\n' % hdrpath)
@@ -66,7 +66,7 @@ def extract_prepare():
 		sys.stderr.write('error: failed to copy \'%s\'\n' % srcpath)
 		sys.exit(1)
 
-	return git_commit
+	return revinfo
 
 def rmpfx(name, pfx='NL80211_'):
 	n = name.lstrip('_')
@@ -224,13 +224,13 @@ def generate_policy(git):
 # start of script
 ###########################################################
 try:
-	commit = extract_prepare()
+	rev = extract_prepare()
 
 	ast = parse_file(EXTRACT_HEADER, use_cpp=True)
-	generate_defs(commit, ast)
-	generate_strmap(commit, ast)
+	generate_defs(rev, ast)
+	generate_strmap(rev, ast)
 
-	generate_policy(commit)
+	generate_policy(rev)
 	sys.stderr.write('Done!\n')
 except SystemExit:
 	sys.stderr.write('Aborting..!!\n')
