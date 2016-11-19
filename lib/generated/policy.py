@@ -2,7 +2,7 @@
 # This file is generated using extract.py using pycparser
 ###########################################################
 # revision:
-#	b953c0d Linux 4.1
+#	61385cc Linux 4.8.8
 ###########################################################
 from netlink.capi import *
 from defs import *
@@ -23,6 +23,10 @@ NLA_BINARY = NLA_NESTED + 3
 IEEE80211_QOS_MAP_MAX_EX = 21
 IEEE80211_QOS_MAP_LEN_MIN = 16
 IEEE80211_QOS_MAP_LEN_MAX = IEEE80211_QOS_MAP_LEN_MIN + 2 * IEEE80211_QOS_MAP_MAX_EX
+
+WLAN_MEBERSHIP_LEN = 8
+WLAN_USER_POSITION_LEN = 16
+VHT_MUMIMO_GROUPS_DATA_LEN = WLAN_MEMBERSHIP_LEN + WLAN_USER_POSITION_LEN
 
 #
 # policy: nl80211_policy
@@ -234,6 +238,11 @@ nl80211_policy[ATTR_WIPHY_SELF_MANAGED_REG].type = NLA_FLAG
 nl80211_policy[ATTR_NETNS_FD].type = NLA_U32
 nl80211_policy[ATTR_SCHED_SCAN_DELAY].type = NLA_U32
 nl80211_policy[ATTR_REG_INDOOR].type = NLA_FLAG
+nl80211_policy[ATTR_PBSS].type = NLA_FLAG
+nl80211_policy[ATTR_BSS_SELECT].type = NLA_NESTED
+nl80211_policy[ATTR_STA_SUPPORT_P2P_PS].type = NLA_U8
+nl80211_policy[ATTR_MU_MIMO_GROUP_DATA].min_len = VHT_MUMIMO_GROUPS_DATA_LEN
+nl80211_policy[ATTR_MU_MIMO_FOLLOW_MAC_ADDR].min_len = ETH_ALEN
 #
 # policy: nl80211_key_policy
 #
@@ -305,6 +314,19 @@ nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_SSID].type = NLA_BINARY
 nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_SSID].min_len = IEEE80211_MAX_SSID_LEN
 nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_RSSI].type = NLA_U32
 #
+# policy: nl80211_plan_policy
+#
+nl80211_plan_policy = nla_policy_array(SCHED_SCAN_PLAN_MAX + 1)
+nl80211_plan_policy[SCHED_SCAN_PLAN_INTERVAL].type = NLA_U32
+nl80211_plan_policy[SCHED_SCAN_PLAN_ITERATIONS].type = NLA_U32
+#
+# policy: nl80211_bss_select_policy
+#
+nl80211_bss_select_policy = nla_policy_array(BSS_SELECT_ATTR_MAX + 1)
+nl80211_bss_select_policy[BSS_SELECT_ATTR_RSSI].type = NLA_FLAG
+nl80211_bss_select_policy[BSS_SELECT_ATTR_BAND_PREF].type = NLA_U32
+nl80211_bss_select_policy[BSS_SELECT_ATTR_RSSI_ADJUST].min_len = 2
+#
 # policy: txq_params_policy
 #
 txq_params_policy = nla_policy_array(TXQ_ATTR_MAX + 1)
@@ -339,17 +361,6 @@ sta_flags_policy[STA_FLAG_TDLS_PEER].type = NLA_FLAG
 nl80211_sta_wme_policy = nla_policy_array(STA_WME_MAX + 1)
 nl80211_sta_wme_policy[STA_WME_UAPSD_QUEUES].type = NLA_U8
 nl80211_sta_wme_policy[STA_WME_MAX_SP].type = NLA_U8
-#
-# policy: reg_rule_policy
-#
-reg_rule_policy = nla_policy_array(REG_RULE_ATTR_MAX + 1)
-reg_rule_policy[ATTR_REG_RULE_FLAGS].type = NLA_U32
-reg_rule_policy[ATTR_FREQ_RANGE_START].type = NLA_U32
-reg_rule_policy[ATTR_FREQ_RANGE_END].type = NLA_U32
-reg_rule_policy[ATTR_FREQ_RANGE_MAX_BW].type = NLA_U32
-reg_rule_policy[ATTR_POWER_RULE_MAX_ANT_GAIN].type = NLA_U32
-reg_rule_policy[ATTR_POWER_RULE_MAX_EIRP].type = NLA_U32
-reg_rule_policy[ATTR_DFS_CAC_TIME].type = NLA_U32
 #
 # policy: nl80211_meshconf_params_policy
 #
@@ -395,6 +406,17 @@ nl80211_mesh_setup_params_policy[MESH_SETUP_USERSPACE_MPM].type = NLA_FLAG
 nl80211_mesh_setup_params_policy[MESH_SETUP_IE].type = NLA_BINARY
 nl80211_mesh_setup_params_policy[MESH_SETUP_IE].min_len = IEEE80211_MAX_DATA_LEN
 nl80211_mesh_setup_params_policy[MESH_SETUP_USERSPACE_AMPE].type = NLA_FLAG
+#
+# policy: reg_rule_policy
+#
+reg_rule_policy = nla_policy_array(REG_RULE_ATTR_MAX + 1)
+reg_rule_policy[ATTR_REG_RULE_FLAGS].type = NLA_U32
+reg_rule_policy[ATTR_FREQ_RANGE_START].type = NLA_U32
+reg_rule_policy[ATTR_FREQ_RANGE_END].type = NLA_U32
+reg_rule_policy[ATTR_FREQ_RANGE_MAX_BW].type = NLA_U32
+reg_rule_policy[ATTR_POWER_RULE_MAX_ANT_GAIN].type = NLA_U32
+reg_rule_policy[ATTR_POWER_RULE_MAX_EIRP].type = NLA_U32
+reg_rule_policy[ATTR_DFS_CAC_TIME].type = NLA_U32
 #
 # policy: nl80211_txattr_policy
 #
