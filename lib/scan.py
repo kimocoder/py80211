@@ -84,23 +84,13 @@ class bss_list(custom_handler):
 			traceback.print_tb(tb)
 		return nl.NL_SKIP
 
-class scan_cmd_base(custom_handler):
+class scan_cmd_base(nl80211_cmd_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
-		self._access = access80211(level)
-		self._nl_cmd = None
-		self._ifidx = ifidx
+		super(scan_cmd_base, self).__init__(ifidx, level)
 
 	def _wait_for_completion(self):
 		while self.scan_busy:
 			self._access._sock.recvmsgs(self._access._rx_cb)
-
-	def _prepare_cmd(self):
-		if self._nl_cmd == None:
-			raise Exception("sub-class must set _nl_cmd")
-
-		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK
-		self._nl_msg = self._access.alloc_genlmsg(self._nl_cmd, flags)
-		nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
 
 	def _send_and_wait(self):
 		self.scan_busy = True
@@ -115,6 +105,11 @@ class scan_cmd_base(custom_handler):
 		self._access.drop_multicast(mcid)
 		return 0
 
+	def send(self):
+		self._prepare_cmd()
+		self._add_attrs()
+		return self._send_and_wait()
+
 class scan_start_base(scan_cmd_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
 		super(scan_start_base, self).__init__(ifidx, level)
@@ -123,7 +118,8 @@ class scan_start_base(scan_cmd_base):
 		self._flags = 0
 		self._ies = None
 
-	def _add_scan_attrs(self):
+	def _add_attrs(self):
+		super(scan_start_base, self)._add_attrs()
 		if self._ssids:
 			i = 0
 			nest = nl.nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_SSIDS)
@@ -165,15 +161,10 @@ class scan_start_base(scan_cmd_base):
 	def set_flags(self, flags):
 		self._flags = flags
 
-	def send(self):
-		self._prepare_cmd()
-		self._add_scan_attrs()
-		self._send_and_wait()
-
 class scan_request(scan_start_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
 		super(scan_request, self).__init__(ifidx, level)
-		self._nl_cmd = nl80211.CMD_TRIGGER_SCAN
+		self._cmd = nl80211.CMD_TRIGGER_SCAN
 
 	def handle(self, msg, arg):
 		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
@@ -186,14 +177,9 @@ class scan_request(scan_start_base):
 class sched_scan_start(scan_start_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
 		super(sched_scan_start, self).__init__(ifidx, level)
-		self._nl_cmd = nl80211.CMD_START_SCHED_SCAN
+		self._cmd = nl80211.CMD_START_SCHED_SCAN
 		self._interval = None
 		self._matches = None
-
-	def _add_scan_attrs(self):
-		super(sched_scan_start, self)._add_scan_attrs()
-		if self._interval != None:
-			nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
 
 	def set_interval(self, interval):
 		self._interval = interval
@@ -215,11 +201,11 @@ class sched_scan_start(scan_start_base):
 
 			nl.nla_nest_end(self._nl_msg._msg, matchset)
 
-	def send(self):
-		self._prepare_cmd()
-		self._add_scan_attrs()
+	def _add_attrs(self):
+		super(sched_scan_start, self)._add_attrs()
 		self._add_matches_attrs()
-		self._send_and_wait()
+		if self._interval != None:
+			nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
 
 	def handle(self, msg, arg):
 		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
@@ -232,11 +218,7 @@ class sched_scan_start(scan_start_base):
 class sched_scan_stop(scan_cmd_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
 		super(sched_scan_stop, self).__init__(ifidx, level)
-		self._nl_cmd = nl80211.CMD_STOP_SCHED_SCAN
-
-	def send(self):
-		self._prepare_cmd()
-		self._send_and_wait()
+		self._cmd = nl80211.CMD_STOP_SCHED_SCAN
 
 	def handle(self, msg, arg):
 		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
