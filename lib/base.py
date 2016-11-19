@@ -328,3 +328,24 @@ class nl80211_managed_object(nl80211_object, custom_handler):
 			print v.message
 			traceback.print_tb(tb)
 
+class nl80211_cmd_base(custom_handler):
+	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+		self._access = access80211(level)
+		self._cmd = None
+		self._ifidx = ifidx
+
+	def _prepare_cmd(self):
+		if self._cmd == None:
+			raise Exception("sub-class must set _cmd")
+
+		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK
+		self._nl_msg = self._access.alloc_genlmsg(self._cmd, flags)
+
+	def _add_attrs(self):
+		nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+
+	def send(self):
+		self._prepare_cmd()
+		self._add_attrs()
+		return self._access.send(self._nl_msg, self)
+
