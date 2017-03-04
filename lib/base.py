@@ -335,6 +335,8 @@ class nl80211_cmd_base(custom_handler):
 		self._ifidx = ifidx
 
 	def _prepare_cmd(self):
+		if hasattr(self, '_nl_msg'):
+			return
 		if self._cmd == None:
 			raise Exception("sub-class must set _cmd")
 
@@ -343,6 +345,10 @@ class nl80211_cmd_base(custom_handler):
 
 	def _add_attrs(self):
 		nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+
+	def nl_msg(self):
+		self._prepare_cmd()
+		return self._nl_msg
 
 	def send(self):
 		self._prepare_cmd()
