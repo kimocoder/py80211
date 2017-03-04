@@ -2,7 +2,7 @@
 # This file is generated using extract.py using pycparser
 ###########################################################
 # revision:
-#	61385cc Linux 4.8.8
+#	v4.10.1
 ###########################################################
 from netlink.capi import *
 from defs import *
@@ -193,7 +193,7 @@ nl80211_policy[ATTR_INACTIVITY_TIMEOUT].type = NLA_U16
 nl80211_policy[ATTR_BG_SCAN_PERIOD].type = NLA_U16
 nl80211_policy[ATTR_WDEV].type = NLA_U64
 nl80211_policy[ATTR_USER_REG_HINT_TYPE].type = NLA_U32
-nl80211_policy[ATTR_SAE_DATA].type = NLA_BINARY
+nl80211_policy[ATTR_AUTH_DATA].type = NLA_BINARY
 nl80211_policy[ATTR_VHT_CAPABILITY].min_len = 12
 nl80211_policy[ATTR_SCAN_FLAGS].type = NLA_U32
 nl80211_policy[ATTR_P2P_CTWINDOW].type = NLA_U8
@@ -243,6 +243,14 @@ nl80211_policy[ATTR_BSS_SELECT].type = NLA_NESTED
 nl80211_policy[ATTR_STA_SUPPORT_P2P_PS].type = NLA_U8
 nl80211_policy[ATTR_MU_MIMO_GROUP_DATA].min_len = VHT_MUMIMO_GROUPS_DATA_LEN
 nl80211_policy[ATTR_MU_MIMO_FOLLOW_MAC_ADDR].min_len = ETH_ALEN
+nl80211_policy[ATTR_NAN_MASTER_PREF].type = NLA_U8
+nl80211_policy[ATTR_NAN_DUAL].type = NLA_U8
+nl80211_policy[ATTR_NAN_FUNC].type = NLA_NESTED
+nl80211_policy[ATTR_FILS_KEK].type = NLA_BINARY
+nl80211_policy[ATTR_FILS_KEK].min_len = FILS_MAX_KEK_LEN
+nl80211_policy[ATTR_FILS_NONCES].min_len = 2 * FILS_NONCE_LEN
+nl80211_policy[ATTR_MULTICAST_TO_UNICAST_ENABLED].type = NLA_FLAG
+nl80211_policy[ATTR_BSSID].min_len = ETH_ALEN
 #
 # policy: nl80211_key_policy
 #
@@ -327,6 +335,37 @@ nl80211_bss_select_policy[BSS_SELECT_ATTR_RSSI].type = NLA_FLAG
 nl80211_bss_select_policy[BSS_SELECT_ATTR_BAND_PREF].type = NLA_U32
 nl80211_bss_select_policy[BSS_SELECT_ATTR_RSSI_ADJUST].min_len = 2
 #
+# policy: nl80211_nan_func_policy
+#
+nl80211_nan_func_policy = nla_policy_array(NAN_FUNC_ATTR_MAX + 1)
+nl80211_nan_func_policy[NAN_FUNC_TYPE].type = NLA_U8
+nl80211_nan_func_policy[NAN_FUNC_SERVICE_ID].type = NLA_BINARY
+nl80211_nan_func_policy[NAN_FUNC_SERVICE_ID].min_len = 6
+nl80211_nan_func_policy[NAN_FUNC_PUBLISH_TYPE].type = NLA_U8
+nl80211_nan_func_policy[NAN_FUNC_PUBLISH_BCAST].type = NLA_FLAG
+nl80211_nan_func_policy[NAN_FUNC_SUBSCRIBE_ACTIVE].type = NLA_FLAG
+nl80211_nan_func_policy[NAN_FUNC_FOLLOW_UP_ID].type = NLA_U8
+nl80211_nan_func_policy[NAN_FUNC_FOLLOW_UP_REQ_ID].type = NLA_U8
+nl80211_nan_func_policy[NAN_FUNC_FOLLOW_UP_DEST].min_len = ETH_ALEN
+nl80211_nan_func_policy[NAN_FUNC_CLOSE_RANGE].type = NLA_FLAG
+nl80211_nan_func_policy[NAN_FUNC_TTL].type = NLA_U32
+nl80211_nan_func_policy[NAN_FUNC_SERVICE_INFO].type = NLA_BINARY
+nl80211_nan_func_policy[NAN_FUNC_SERVICE_INFO].min_len = 0xff
+nl80211_nan_func_policy[NAN_FUNC_SRF].type = NLA_NESTED
+nl80211_nan_func_policy[NAN_FUNC_RX_MATCH_FILTER].type = NLA_NESTED
+nl80211_nan_func_policy[NAN_FUNC_TX_MATCH_FILTER].type = NLA_NESTED
+nl80211_nan_func_policy[NAN_FUNC_INSTANCE_ID].type = NLA_U8
+nl80211_nan_func_policy[NAN_FUNC_TERM_REASON].type = NLA_U8
+#
+# policy: nl80211_nan_srf_policy
+#
+nl80211_nan_srf_policy = nla_policy_array(NAN_SRF_ATTR_MAX + 1)
+nl80211_nan_srf_policy[NAN_SRF_INCLUDE].type = NLA_FLAG
+nl80211_nan_srf_policy[NAN_SRF_BF].type = NLA_BINARY
+nl80211_nan_srf_policy[NAN_SRF_BF].min_len = 0xff
+nl80211_nan_srf_policy[NAN_SRF_BF_IDX].type = NLA_U8
+nl80211_nan_srf_policy[NAN_SRF_MAC_ADDRS].type = NLA_NESTED
+#
 # policy: txq_params_policy
 #
 txq_params_policy = nla_policy_array(TXQ_ATTR_MAX + 1)
@@ -345,6 +384,16 @@ mntr_flags_policy[MNTR_FLAG_CONTROL].type = NLA_FLAG
 mntr_flags_policy[MNTR_FLAG_OTHER_BSS].type = NLA_FLAG
 mntr_flags_policy[MNTR_FLAG_COOK_FRAMES].type = NLA_FLAG
 mntr_flags_policy[MNTR_FLAG_ACTIVE].type = NLA_FLAG
+#
+# policy: nl80211_txattr_policy
+#
+nl80211_txattr_policy = nla_policy_array(TXRATE_MAX + 1)
+nl80211_txattr_policy[TXRATE_LEGACY].type = NLA_BINARY
+nl80211_txattr_policy[TXRATE_LEGACY].min_len = 32
+nl80211_txattr_policy[TXRATE_HT].type = NLA_BINARY
+nl80211_txattr_policy[TXRATE_HT].min_len = 77
+nl80211_txattr_policy[TXRATE_VHT].min_len = 8 * 2
+nl80211_txattr_policy[TXRATE_GI].type = NLA_U8
 #
 # policy: sta_flags_policy
 #
@@ -417,16 +466,6 @@ reg_rule_policy[ATTR_FREQ_RANGE_MAX_BW].type = NLA_U32
 reg_rule_policy[ATTR_POWER_RULE_MAX_ANT_GAIN].type = NLA_U32
 reg_rule_policy[ATTR_POWER_RULE_MAX_EIRP].type = NLA_U32
 reg_rule_policy[ATTR_DFS_CAC_TIME].type = NLA_U32
-#
-# policy: nl80211_txattr_policy
-#
-nl80211_txattr_policy = nla_policy_array(TXRATE_MAX + 1)
-nl80211_txattr_policy[TXRATE_LEGACY].type = NLA_BINARY
-nl80211_txattr_policy[TXRATE_LEGACY].min_len = 32
-nl80211_txattr_policy[TXRATE_HT].type = NLA_BINARY
-nl80211_txattr_policy[TXRATE_HT].min_len = 77
-nl80211_txattr_policy[TXRATE_VHT].min_len = None
-nl80211_txattr_policy[TXRATE_GI].type = NLA_U8
 #
 # policy: nl80211_attr_cqm_policy
 #
