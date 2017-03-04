@@ -125,6 +125,7 @@ class wiphy(nl80211_managed_object):
 
 	def put_obj_id(self, msg):
 		nl.nla_put_u32(msg._msg, nl80211.ATTR_WIPHY, self.phynum)
+		nl.nla_put_flag(msg._msg, nl80211.ATTR_SPLIT_WIPHY_DUMP)
 
 	@property
 	def phynum(self):
@@ -146,6 +147,7 @@ class wiphy_list(custom_handler):
 		a = access80211(kind)
 		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK | nlc.NLM_F_DUMP
 		m = a.alloc_genlmsg(nl80211.CMD_GET_WIPHY, flags)
+		nl.nla_put_flag(m._msg, nl80211.ATTR_SPLIT_WIPHY_DUMP)
 		self._access = a
 		a.send(m, self)
 
