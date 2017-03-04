@@ -213,7 +213,7 @@ class sched_scan_start(scan_start_base):
 		# A schedule scan is complete immediately when it gets started
 		if genlh.cmd in [ nl80211.CMD_START_SCHED_SCAN ]:
 			self.scan_busy = False
-			return nl.NL_SKIP
+		return nl.NL_SKIP
 
 class sched_scan_stop(scan_cmd_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
