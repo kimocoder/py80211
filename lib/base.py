@@ -18,6 +18,7 @@
 #
 import sys
 import traceback
+import os
 from abc import *
 
 import netlink.capi as nl
@@ -36,6 +37,16 @@ NLA_BINARY = nl.NLA_NESTED + 3
 # doing a transaction.
 class AccessBusyError(Exception):
 	pass
+
+##
+# Exception wich is raised when kernel-side returns an
+# error.
+class CommandFailedError(Exception):
+	def __init__(self, errno):
+		self._errno = errno
+
+	def __str__(self):
+		return "netlink failure: %s" % os.strerror(self._errno)
 
 ##
 # Abstract class specifying the interface for object class which
@@ -72,6 +83,17 @@ class access80211(object):
 		return msg
 
 	##
+	# Receive messages and only raise exception if
+	# unexpected, eg. socket errors.
+	def recvmsgs(self):
+		try:
+			self._sock.recvmsgs(self._rx_cb)
+		except Exception as e:
+			if self.busy > 0:
+				raise e
+		if self.busy < 0:
+			raise CommandFailedError(self.busy)
+	##
 	# Send netlink message to the kernel and wait for response. The provided
 	# handler will be called for NL_CB_VALID callback.
 	def send(self, msg, handler):
@@ -83,8 +105,7 @@ class access80211(object):
 		self._rx_cb.set_type(nl.NL_CB_VALID, nl.NL_CB_CUSTOM, handler.handle, None)
 		err = self._sock.send_auto_complete(msg)
 		while self.busy > 0 and not err < 0:
-			self._sock.recvmsgs(self._rx_cb)
-			err = self.busy
+			self.recvmsgs()
 		return err
 
 	##
