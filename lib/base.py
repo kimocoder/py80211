@@ -31,6 +31,10 @@ import factory
 
 NLA_NUL_STRING = nl.NLA_NESTED + 2
 NLA_BINARY = nl.NLA_NESTED + 3
+NLA_S8 = NLA_NESTED + 4
+NLA_S16 = NLA_NESTED + 5
+NLA_S32 = NLA_NESTED + 6
+NLA_S64 = NLA_NESTED + 7
 
 ##
 # Exception which is raised when netlink socket is already
@@ -232,6 +236,7 @@ class nl80211_object(object):
 	# which may be a list of values.
 	def convert_sign(self, attr, pol):
 		conv_tab = {
+			nl.NLA_U64: 0x8000000000000000,
 			nl.NLA_U32: 0x80000000,
 			nl.NLA_U16: 0x8000,
 			nl.NLA_U8: 0x80
@@ -263,6 +268,19 @@ class nl80211_object(object):
 		for aid in attrs.keys():
 			try:
 				pol = self._policy[aid]
+				if pol.type == NLA_S8:
+					pol.type = nl.NLA_U8
+					pol.signed = True
+				elif pol.type == NLA_S16:
+					pol.type = nl.NLA_U16
+					pol.signed = True
+				elif pol.type == NLA_S32:
+					pol.type = nl.NLA_U32
+					pol.signed = True
+				elif pol.type == NLA_S64:
+					pol.type = nl.NLA_U64
+					pol.signed = True
+
 				if pol.type == NLA_NUL_STRING:
 					self._attrs[aid] = nl.nla_get_string(attrs[aid])
 				elif pol.type == nl.NLA_U64:

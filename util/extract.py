@@ -204,7 +204,11 @@ def generate_policy(git):
 	polmap.write('IEEE80211_MAX_MESH_ID_LEN = 32\n')
 	polmap.write('IEEE80211_MAX_SSID_LEN = 32\n')
 	polmap.write('NLA_NUL_STRING = NLA_NESTED + 2\n')
-	polmap.write('NLA_BINARY = NLA_NESTED + 3\n\n')
+	polmap.write('NLA_BINARY = NLA_NESTED + 3\n')
+	polmap.write('NLA_S8 = NLA_NESTED + 4\n')
+        polmap.write('NLA_S16 = NLA_NESTED + 5\n')
+        polmap.write('NLA_S32 = NLA_NESTED + 6\n')
+        polmap.write('NLA_S64 = NLA_NESTED + 7\n\n')
 	for ext in ast.ext:
 		# filter out array declarations
 		if not isinstance(ext.type, c_ast.ArrayDecl):
