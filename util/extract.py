@@ -171,6 +171,15 @@ def generate_strmap(git, ast):
 			count += 1
 	strmap.close()
 
+def append_policy(out, decl):
+	if not os.path.exists('%s.py' % decl.name):
+		return
+	out.write('# append/override %s entries\n' % decl.name)
+	poldef = open('%s.py' % decl.name, 'r')
+	for l in poldef:
+		out.write(l)
+	poldef.close()
+
 def dump_policy_array(out, decl):
 	out.write('#\n# policy: %s\n#\n' % decl.name)
 	out.write('%s = nla_policy_array(' % decl.name)
@@ -232,6 +241,7 @@ def generate_policy(git):
 			# maybe need to shout here?
 			continue
 		dump_policy_array(polmap, ext)
+		append_policy(polmap, ext)
 	polmap.close()
 
 ###########################################################
