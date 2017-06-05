@@ -31,10 +31,10 @@ import factory
 
 NLA_NUL_STRING = nl.NLA_NESTED + 2
 NLA_BINARY = nl.NLA_NESTED + 3
-NLA_S8 = NLA_NESTED + 4
-NLA_S16 = NLA_NESTED + 5
-NLA_S32 = NLA_NESTED + 6
-NLA_S64 = NLA_NESTED + 7
+NLA_S8 = nl.NLA_NESTED + 4
+NLA_S16 = nl.NLA_NESTED + 5
+NLA_S32 = nl.NLA_NESTED + 6
+NLA_S64 = nl.NLA_NESTED + 7
 
 ##
 # Exception which is raised when netlink socket is already
