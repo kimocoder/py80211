@@ -25,7 +25,7 @@ import re
 
 EXTRACT_HEADER = 'extract.h'
 hdrpath = 'include|uapi|linux|nl80211.h'.replace('|', os.sep)
-srcpath = 'net|wireless|nl80211.c'.replace('|', os.sep)
+srcpath = 'net|wireless|nl80211.i'.replace('|', os.sep)
 
 args = None
 
@@ -56,8 +56,24 @@ def extract_prepare():
 		sys.stderr.write('error: failed to copy \'%s\'\n' % hdrpath)
 		sys.exit(1)
 
-	if not os.path.exists(os.path.join(args.srcdir, srcpath)):
-		sys.stderr.write('error: provided source tree does not contain \'%s\'\n' % srcpath)
+	# no need to generate and copy preprocessor output
+	if os.path.exists('tmp_nl80211.c'):
+		return revinfo
+
+	# clean source tree
+	cmd = 'make -C %s clean' % args.srcdir
+	ret = subprocess.call(cmd.split())
+	if ret != 0:
+		sys.stderr.write('error: cleaning source tree failed\n')
+		sys.exit(1)
+
+	# generate preprocessed source file
+	wldir = os.path.dirname(srcpath)
+	fname = os.path.basename(srcpath)
+	cmd = 'make -C %s M=%s %s' % (args.srcdir, wldir, fname)
+	ret = subprocess.call(cmd.split())
+	if ret != 0:
+		sys.stderr.write('error: failed to generate \'%s\'\n' % srcpath)
 		sys.exit(1)
 
 	srcpath = os.path.join(args.srcdir, srcpath)
@@ -174,12 +190,13 @@ def generate_policy(git):
 	global args
 	# we first extract all nla_policy definitions
 	# from the source file and feed only those to
-	# the abstract source tree parser.
-	sys.stderr.write('extract policy definitions\n')
-	inputdata = open('nl80211.c', 'r').read()
-	policies = re.findall('(struct nla_policy[ \t\n]+[^;]+;)', inputdata, re.M)
-
+	# the abstract source tree parser. Skip if the
+	# temporary file exist (useful for fixing up
+	# manually).
 	if not os.path.exists('tmp_nl80211.c'):
+		sys.stderr.write('extract policy definitions\n')
+		inputdata = open('nl80211.i', 'r').read()
+		policies = re.findall('(struct nla_policy[ \t\n]+.+_policy\[.+\][ \t\n]+[^;]+;)', inputdata, re.M)
 		tmpfile = open('tmp_nl80211.c', 'w')
 		tmpfile.write('#include "extract.h"\n')
 		for p in policies:
@@ -195,20 +212,13 @@ def generate_policy(git):
 	sys.stderr.write('create policy mappings\n')
 	n = 0
 	polmap.write('from netlink.capi import *\n')
-	polmap.write('from defs import *\n')
-	polmap.write('\n# defines used in nl80211.c\n')
-	polmap.write('ETH_ALEN = 6\n')
-	polmap.write('WLAN_MAX_KEY_LEN = 32\n')
-	polmap.write('WLAN_PMKID_LEN = 16\n')
-	polmap.write('IEEE80211_MAX_DATA_LEN = 2304\n')
-	polmap.write('IEEE80211_MAX_MESH_ID_LEN = 32\n')
-	polmap.write('IEEE80211_MAX_SSID_LEN = 32\n')
+	polmap.write('from defs import *\n\n')
 	polmap.write('NLA_NUL_STRING = NLA_NESTED + 2\n')
 	polmap.write('NLA_BINARY = NLA_NESTED + 3\n')
 	polmap.write('NLA_S8 = NLA_NESTED + 4\n')
-        polmap.write('NLA_S16 = NLA_NESTED + 5\n')
-        polmap.write('NLA_S32 = NLA_NESTED + 6\n')
-        polmap.write('NLA_S64 = NLA_NESTED + 7\n\n')
+	polmap.write('NLA_S16 = NLA_NESTED + 5\n')
+	polmap.write('NLA_S32 = NLA_NESTED + 6\n')
+	polmap.write('NLA_S64 = NLA_NESTED + 7\n\n')
 	for ext in ast.ext:
 		# filter out array declarations
 		if not isinstance(ext.type, c_ast.ArrayDecl):
