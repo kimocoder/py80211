@@ -180,6 +180,12 @@ def append_policy(out, decl):
 		out.write(l)
 	poldef.close()
 
+def get_policy_entry_type(exprs):
+	for initexp in exprs:
+		if oper_str(initexp.name[0]) == 'type':
+			return oper_str(initexp.expr)
+	return 'NLA_UNSPEC'
+
 def dump_policy_array(out, decl):
 	out.write('#\n# policy: %s\n#\n' % decl.name)
 	out.write('%s = nla_policy_array(' % decl.name)
@@ -187,11 +193,36 @@ def dump_policy_array(out, decl):
 	out.write(')\n')
 	for exp in decl.init.exprs:
 		comma_prefix = False
+		type = get_policy_entry_type(exp.expr.exprs)
 		for initexp in exp.expr.exprs:
-			# kernel policy member 'len' is called 'min_len' in libnl
+			# kernel policy member 'len' has different meaning
+			# depending on the type. Below comment taken from
+			# kernel documentation of struct nla_policy:
+			#
+			# Meaning of `len' field:
+			#    NLA_STRING           Maximum length of string
+			#    NLA_NUL_STRING       Maximum length of string (excluding NUL)
+			#    NLA_FLAG             Unused
+			#    NLA_BINARY           Maximum length of attribute payload
+			#    NLA_NESTED           Don't use `len' field -- length verification is
+			#                         done by checking len of nested header (or empty)
+			#    NLA_NESTED_COMPAT    Minimum length of structure payload
+			#    NLA_U8, NLA_U16,
+			#    NLA_U32, NLA_U64,
+			#    NLA_S8, NLA_S16,
+			#    NLA_S32, NLA_S64,
+			#    NLA_MSECS            Leaving the length field zero will verify the
+			#                         given type fits, using it verifies minimum length
+			#                         just like "All other"
+			#    All other            Minimum length of attribute payload
 			field = oper_str(initexp.name[0])
 			if field == 'len':
-				field = 'min_len'
+				if type in [ 'NLA_STRING', 'NLA_NUL_STRING', 'NLA_BINARY' ]:
+					field = 'max_len'
+				elif type in [ 'NLA_FLAG', 'NLA_NESTED' ]:
+					continue
+				else:
+					field = 'min_len'
 			out.write('%s[%s].%s = ' % (decl.name, oper_str(exp.name[0]), field))
 			out.write('%s\n' % oper_str(initexp.expr))
 
