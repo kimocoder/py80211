@@ -92,13 +92,13 @@ wowlan_policy = nl.nla_policy_array(nl80211.NUM_NL80211_WOWLAN_TRIG)
 wowlan_policy[nl80211.WOWLAN_TRIG_ANY].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_DISCONNECT].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_MAGIC_PKT].type = nl.NLA_FLAG
-wowlan_policy[nl80211.WOWLAN_TRIG_PKT_PATTERN].minlen = 12
+wowlan_policy[nl80211.WOWLAN_TRIG_PKT_PATTERN].minlen = 16
 wowlan_policy[nl80211.WOWLAN_TRIG_GTK_REKEY_SUPPORTED].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_GTK_REKEY_FAILURE].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_EAP_IDENT_REQUEST].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_4WAY_HANDSHAKE].type = nl.NLA_FLAG
 wowlan_policy[nl80211.WOWLAN_TRIG_RFKILL_RELEASE].type = nl.NLA_FLAG
-wowlan_policy[nl80211.WOWLAN_TRIG_NET_DETECT].type = nl.NLA_FLAG
+wowlan_policy[nl80211.WOWLAN_TRIG_NET_DETECT].type = nl.NLA_U32
 
 class wowlan_trigger_support(nl80211_object):
 	pass
