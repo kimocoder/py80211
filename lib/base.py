@@ -199,6 +199,8 @@ class nl80211_object(object):
 		nest_list = []
 		for nest_element in nl.nla_get_nested(attr_list):
 			nest_obj = self.create_nested(nest_element, aid)
+			if isinstance(nest_obj, nl80211_object):
+				nest_obj.nla_type = nl.nla_type(nest_element)
 			nest_list.append(nest_obj)
 		return nest_list
 
@@ -262,6 +264,25 @@ class nl80211_object(object):
 		pass
 
 	##
+	# In case of split dump we get certain attributes passed in
+	# subsequent netlink messages and need to merge the result.
+	def merge_nested_attrs(self, aid, nest):
+		if not aid in self._attrs:
+			self._attrs[aid] = nest
+			return
+		if not isinstance(nest, list):
+			raise Exception("only 'list' instances supported: %s aid %d nest %s" % (type(self), aid, type(nest)))
+
+		last = len(self._attrs[aid]) - 1
+		last = self._attrs[aid][last]
+		for n in nest:
+			if n.nla_type != last.nla_type:
+				self._attrs[aid].append(n)
+				last = n
+			else:
+				for idx in n._attrs.keys():
+					last.merge_nested_attrs(idx, n._attrs[idx])
+	##
 	# Stores the attributes using the appropriate nla_get function
 	# according the provided policy.
 	def store_attrs(self, attrs):
@@ -304,7 +325,7 @@ class nl80211_object(object):
 						obj = self.create_list(attrs[aid], pol)
 					else:
 						obj = self.create_nested_list(attrs[aid], aid)
-					self._attrs[aid] = obj
+					self.merge_nested_attrs(aid, obj)
 				elif pol.type in [ NLA_BINARY, nl.NLA_UNSPEC ]:
 					self._attrs[aid] = nl.nla_data(attrs[aid])
 				if hasattr(pol, 'signed') and pol.signed:
