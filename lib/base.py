@@ -78,7 +78,33 @@ class access80211(object):
 
 		self._sock.connect(nlc.NETLINK_GENERIC)
 		self._family = genl.genl_ctrl_resolve(self._sock._sock, 'nl80211')
-		self.busy = 0
+		self._get_protocol_features()
+
+	def _protocol_feature_handler(self, m, a):
+                try:
+                        e, attrs = genl.py_genlmsg_parse(nl.nlmsg_hdr(m), 0, nl80211.ATTR_MAX, None)
+			if nl80211.ATTR_PROTOCOL_FEATURES in attrs:
+				self._features = nl.nla_get_u32(attrs[nl80211.ATTR_PROTOCOL_FEATURES])
+                        return nl.NL_SKIP
+                except Exception as e:
+                        (t,v,tb) = sys.exc_info()
+                        print v.message
+                        traceback.print_tb(tb)
+
+		pass
+
+	##
+	# Obtain protocol features
+	def _get_protocol_features(self):
+		msg = self.alloc_genlmsg(nl80211.CMD_GET_PROTOCOL_FEATURES)
+		self.busy = 1
+		self._rx_cb.set_type(nl.NL_CB_VALID, nl.NL_CB_CUSTOM, self._protocol_feature_handler, None)
+		self._send(msg)
+
+	def has_protocol_feature(self, feat):
+		if self._features & feat:
+			return True
+		return False
 
 	##
 	# Allocates a netlink message setup with genl header for nl80211 family.
@@ -97,6 +123,9 @@ class access80211(object):
 			raise AccessBusyError()
 		self.busy = 1
 		self._rx_cb.set_type(nl.NL_CB_VALID, nl.NL_CB_CUSTOM, handler.handle, None)
+		self._send(msg)
+
+	def _send(self, msg):
 		try:
 			self._sock.send_auto_complete(msg)
 			while self.busy > 0:

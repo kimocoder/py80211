@@ -145,9 +145,13 @@ class wiphy_list(custom_handler):
 	def __init__(self, kind=nl.NL_CB_DEFAULT):
 		self._wiphy = {}
 		a = access80211(kind)
-		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK | nlc.NLM_F_DUMP
+		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK
+		split_wiphy = a.has_protocol_feature(nl80211.PROTOCOL_FEATURE_SPLIT_WIPHY_DUMP)
+		if split_wiphy:
+			flags |= nlc.NLM_F_DUMP
 		m = a.alloc_genlmsg(nl80211.CMD_GET_WIPHY, flags)
-		nl.nla_put_flag(m._msg, nl80211.ATTR_SPLIT_WIPHY_DUMP)
+		if split_wiphy:
+			nl.nla_put_flag(m._msg, nl80211.ATTR_SPLIT_WIPHY_DUMP)
 		self._access = a
 		a.send(m, self)
 
