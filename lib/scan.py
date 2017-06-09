@@ -96,19 +96,17 @@ class scan_cmd_base(nl80211_cmd_base):
 		self.scan_busy = True
 		self._access.disable_seq_check()
 		mcid = self._access.subscribe_multicast('scan')
-		ret = self._access.send(self._nl_msg, self)
-		if ret < 0:
+		try:
+			self._access.send(self._nl_msg, self)
+			self._wait_for_completion()
+		finally:
 			self.scan_busy = False
-			return ret
-
-		self._wait_for_completion()
-		self._access.drop_multicast(mcid)
-		return 0
+			self._access.drop_multicast(mcid)
 
 	def send(self):
 		self._prepare_cmd()
 		self._add_attrs()
-		return self._send_and_wait()
+		self._send_and_wait()
 
 class scan_start_base(scan_cmd_base):
 	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
