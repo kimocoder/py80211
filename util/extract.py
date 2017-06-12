@@ -172,10 +172,11 @@ def generate_strmap(git, ast):
 	strmap.close()
 
 def append_policy(out, decl):
-	if not os.path.exists('%s.py' % decl.name):
+	override = str('%s|%s.py' % ('extract.d', decl.name)).replace('|', os.sep)
+	if not os.path.exists(override):
 		return
 	out.write('# append/override %s entries\n' % decl.name)
-	poldef = open('%s.py' % decl.name, 'r')
+	poldef = open(override, 'r')
 	for l in poldef:
 		out.write(l)
 	poldef.close()
