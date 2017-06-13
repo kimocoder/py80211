@@ -27,33 +27,25 @@ EXTRACT_HEADER = 'extract.h'
 hdrpath = 'include|uapi|linux|nl80211.h'.replace('|', os.sep)
 srcpath = 'net|wireless|nl80211.i'.replace('|', os.sep)
 
-args = None
+def extract_prepare(srcdir):
+	global hdrpath, srcpath
 
-def extract_prepare():
-	global hdrpath, srcpath, args
-	parser = argparse.ArgumentParser(description='extract code from nl80211 source files')
-	parser.add_argument('srcdir', help='source tree holding nl80211 files')
-	parser.add_argument('destdir', help='directory to store generated files')
-
-	# parse command line arguments
-	args = parser.parse_args()
-
-	gitdir = os.path.join(args.srcdir, '.git')
-	if not os.path.exists(os.path.join(args.srcdir, '.git')):
+	gitdir = os.path.join(srcdir, '.git')
+	if not os.path.exists(os.path.join(srcdir, '.git')):
 		sys.stderr.write('warning: could not find git revision info in source tree\n')
 		revinfo = 'unknown'
 	else:
 		revinfo = subprocess.check_output(['git', '--git-dir=%s' % gitdir, 'describe'])
 		sys.stdout.write('source tree on revision %s\n' % revinfo)
 
-	if not os.path.exists(os.path.join(args.srcdir, hdrpath)):
-		sys.stderr.write('error: provided source tree does contain \'%s\'\n' % hdrpath)
+	if not os.path.exists(os.path.join(srcdir, hdrpath)):
+		sys.stderr.write('error: source tree does not contain \'%s\'\n' % hdrpath)
 		sys.exit(1)
 
-	hdrpath = os.path.join(args.srcdir, hdrpath)
-	ret = subprocess.call([ 'cp', hdrpath, '.' ])
+	cppath = os.path.join(srcdir, hdrpath)
+	ret = subprocess.call([ 'cp', cppath, '.' ])
 	if ret != 0:
-		sys.stderr.write('error: failed to copy \'%s\'\n' % hdrpath)
+		sys.stderr.write('error: failed to copy \'%s\'\n' % cppath)
 		sys.exit(1)
 
 	# no need to generate and copy preprocessor output
@@ -61,7 +53,7 @@ def extract_prepare():
 		return revinfo
 
 	# clean source tree
-	cmd = 'make -C %s clean' % args.srcdir
+	cmd = 'make -C %s clean' % srcdir
 	ret = subprocess.call(cmd.split())
 	if ret != 0:
 		sys.stderr.write('error: cleaning source tree failed\n')
@@ -70,16 +62,16 @@ def extract_prepare():
 	# generate preprocessed source file
 	wldir = os.path.dirname(srcpath)
 	fname = os.path.basename(srcpath)
-	cmd = 'make -C %s M=%s %s' % (args.srcdir, wldir, fname)
+	cmd = 'make -C %s M=%s %s' % (srcdir, wldir, fname)
 	ret = subprocess.call(cmd.split())
 	if ret != 0:
 		sys.stderr.write('error: failed to generate \'%s\'\n' % srcpath)
 		sys.exit(1)
 
-	srcpath = os.path.join(args.srcdir, srcpath)
-	ret = subprocess.call([ 'cp', srcpath, '.' ])
+	cppath = os.path.join(srcdir, srcpath)
+	ret = subprocess.call([ 'cp', cppath, '.' ])
 	if ret != 0:
-		sys.stderr.write('error: failed to copy \'%s\'\n' % srcpath)
+		sys.stderr.write('error: failed to copy \'%s\'\n' % cppath)
 		sys.exit(1)
 
 	return revinfo
@@ -148,21 +140,19 @@ def dump_filehdr(out, git):
 	out.write('#\t%s' % git)
 	out.write('###########################################################\n')
 
-def generate_defs(git, ast):
-	global args
+def generate_defs(destdir, git, ast):
 	sys.stderr.write('generating python definitions\n')
-	defs = open(os.path.join(args.destdir, 'defs.py'), 'w')
+	defs = open(os.path.join(destdir, 'defs.py'), 'w')
 	dump_filehdr(defs, git)
 	for ext in ast.ext:
 		if isinstance(ext.type, c_ast.Enum):
 			dump_enum(defs, ext.type)
 	defs.close()
 
-def generate_strmap(git, ast):
-	global args
+def generate_strmap(destdir, git, ast):
 	sys.stderr.write('generating python string mappings\n')
 	count = 0
-	strmap = open(os.path.join(args.destdir, 'strmap.py'), 'w')
+	strmap = open(os.path.join(destdir, 'strmap.py'), 'w')
 	dump_filehdr(strmap, git)
 	strmap.write('from defs import *\n')
 	for ext in ast.ext:
@@ -227,8 +217,7 @@ def dump_policy_array(out, decl):
 			out.write('%s[%s].%s = ' % (decl.name, oper_str(exp.name[0]), field))
 			out.write('%s\n' % oper_str(initexp.expr))
 
-def generate_policy(git):
-	global args
+def generate_policy(destdir, git):
 	# we first extract all nla_policy definitions
 	# from the source file and feed only those to
 	# the abstract source tree parser. Skip if the
@@ -248,7 +237,7 @@ def generate_policy(git):
 		return
 
 	# generate policy maps
-	polmap = open(os.path.join(args.destdir, 'policy.py'), 'w')
+	polmap = open(os.path.join(destdir, 'policy.py'), 'w')
 	dump_filehdr(polmap, git)
 	sys.stderr.write('create policy mappings\n')
 	n = 0
@@ -279,15 +268,22 @@ def generate_policy(git):
 ###########################################################
 # start of script
 ###########################################################
-try:
-	rev = extract_prepare()
+def run(srcdir, destdir):
+	rev = extract_prepare(srcdir)
 
 	ast = parse_file(EXTRACT_HEADER, use_cpp=True)
-	generate_defs(rev, ast)
-	generate_strmap(rev, ast)
-
-	generate_policy(rev)
+	generate_defs(destdir, rev, ast)
+	generate_strmap(destdir, rev, ast)
+	generate_policy(destdir, rev)
 	sys.stderr.write('Done!\n')
-except SystemExit:
-	sys.stderr.write('Aborting..!!\n')
+
+if __name__ == "__main__":
+	try:
+		parser = argparse.ArgumentParser(description='extract code from nl80211 source files')
+		parser.add_argument('srcdir', help='source tree holding nl80211 files')
+		parser.add_argument('destdir', help='directory to store generated files')
+		args = parser.parse_args()
+		run(args.srcdir, args.destdir)
+	except SystemExit:
+		sys.stderr.write('Aborting..!!\n')
 
