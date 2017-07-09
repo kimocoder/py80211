@@ -10,6 +10,12 @@ def pr_info(s):
 def checkout_source(srcdir, src):
 	if not os.path.exists('%s/.git/refs/remotes/%s' % (srcdir, src)):
 		raise Exception('specified source branch not found: %s' % src)
+	FETCH = 'git --work-tree=%s --git-dir=%s/.git fetch %s %s' % ((srcdir, srcdir) + tuple(src.split('/')))
+	pr_info(" * refresh %s in %s" % (src, srcdir))
+	ret = subprocess.call(FETCH.split())
+	if ret < 0:
+		raise Exception('updating source branch failed: err=%d (%s)' % (ret, src))
+
 	CO = 'git --work-tree=%s --git-dir=%s/.git checkout %s' % (srcdir, srcdir, src)
 	pr_info(" * checking out %s in %s" % (src, srcdir))
 	ret = subprocess.call(CO.split())
