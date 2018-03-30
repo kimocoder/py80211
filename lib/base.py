@@ -21,20 +21,30 @@ import traceback
 import os
 from abc import *
 
-import netlink.capi as nl
-import netlink.genl.capi as genl
-import netlink.core as nlc
+from netlink.capi import (NL_CB_DEFAULT, NL_CB_FINISH, NL_CB_ACK, NL_CB_CUSTOM,
+			  NL_CB_SEQ_CHECK, NL_CB_VALID, NL_SKIP, NL_OK, NL_STOP,
+			  NLA_NESTED, NLA_U64, NLA_U32, NLA_U16, NLA_U8,
+			  NLA_FLAG, NLA_UNSPEC,
+			  nl_socket_add_membership, nl_socket_drop_membership,
+			  nlmsg_hdr, py_nla_parse_nested, nla_type,
+			  nla_get_nested, nla_get_string, nla_get_u64,
+			  nla_get_u32, nla_get_u16, nla_get_u8,
+			  nla_data, nla_put_u32)
+from netlink.genl.capi import (genlmsg_hdr, genl_ctrl_resolve, py_genlmsg_parse,
+			       genlmsg_put, genl_ctrl_resolve_grp)
+from netlink.core import (Callback, Socket, Message, NETLINK_GENERIC,
+			  NLM_F_REQUEST, NLM_F_ACK)
 
 import generated.defs as nl80211
 from generated import strmap
 import factory
 
-NLA_NUL_STRING = nl.NLA_NESTED + 2
-NLA_BINARY = nl.NLA_NESTED + 3
-NLA_S8 = nl.NLA_NESTED + 4
-NLA_S16 = nl.NLA_NESTED + 5
-NLA_S32 = nl.NLA_NESTED + 6
-NLA_S64 = nl.NLA_NESTED + 7
+NLA_NUL_STRING = NLA_NESTED + 2
+NLA_BINARY = NLA_NESTED + 3
+NLA_S8 = NLA_NESTED + 4
+NLA_S16 = NLA_NESTED + 5
+NLA_S32 = NLA_NESTED + 6
+NLA_S64 = NLA_NESTED + 7
 
 ##
 # Exception which is raised when netlink socket is already
@@ -47,7 +57,7 @@ class AccessBusyError(Exception):
 # error.
 class CommandFailedError(Exception):
 	def __init__(self, msg, errno):
-		self._cmd = genl.genlmsg_hdr(msg.hdr).cmd
+		self._cmd = genlmsg_hdr(msg.hdr).cmd
 		self._errno = errno
 
 	def __str__(self):
@@ -67,25 +77,25 @@ class custom_handler(object):
 # This class provides socket connection to the nl80211 genl family.
 class access80211(object):
 	""" provide access to the nl80211 API """
-	def __init__(self, level=nl.NL_CB_DEFAULT):
-		self._tx_cb = nlc.Callback(level)
-		self._rx_cb = nlc.Callback(level)
-		self._sock = nlc.Socket(self._tx_cb)
+	def __init__(self, level=NL_CB_DEFAULT):
+		self._tx_cb = Callback(level)
+		self._rx_cb = Callback(level)
+		self._sock = Socket(self._tx_cb)
 
-		self._rx_cb.set_err(nl.NL_CB_CUSTOM, self.error_handler, None)
-		self._rx_cb.set_type(nl.NL_CB_FINISH, nl.NL_CB_CUSTOM, self.finish_handler, None)
-		self._rx_cb.set_type(nl.NL_CB_ACK, nl.NL_CB_CUSTOM, self.ack_handler, None)
+		self._rx_cb.set_err(NL_CB_CUSTOM, self.error_handler, None)
+		self._rx_cb.set_type(NL_CB_FINISH, NL_CB_CUSTOM, self.finish_handler, None)
+		self._rx_cb.set_type(NL_CB_ACK, NL_CB_CUSTOM, self.ack_handler, None)
 
-		self._sock.connect(nlc.NETLINK_GENERIC)
-		self._family = genl.genl_ctrl_resolve(self._sock._sock, 'nl80211')
+		self._sock.connect(NETLINK_GENERIC)
+		self._family = genl_ctrl_resolve(self._sock._sock, 'nl80211')
 		self._get_protocol_features()
 
 	def _protocol_feature_handler(self, m, a):
                 try:
-                        e, attrs = genl.py_genlmsg_parse(nl.nlmsg_hdr(m), 0, nl80211.ATTR_MAX, None)
+                        e, attrs = py_genlmsg_parse(nlmsg_hdr(m), 0, nl80211.ATTR_MAX, None)
 			if nl80211.ATTR_PROTOCOL_FEATURES in attrs:
-				self._features = nl.nla_get_u32(attrs[nl80211.ATTR_PROTOCOL_FEATURES])
-                        return nl.NL_SKIP
+				self._features = nla_get_u32(attrs[nl80211.ATTR_PROTOCOL_FEATURES])
+                        return NL_SKIP
                 except Exception as e:
                         (t,v,tb) = sys.exc_info()
                         print v.message
@@ -98,7 +108,7 @@ class access80211(object):
 	def _get_protocol_features(self):
 		msg = self.alloc_genlmsg(nl80211.CMD_GET_PROTOCOL_FEATURES)
 		self.busy = 1
-		self._rx_cb.set_type(nl.NL_CB_VALID, nl.NL_CB_CUSTOM, self._protocol_feature_handler, None)
+		self._rx_cb.set_type(NL_CB_VALID, NL_CB_CUSTOM, self._protocol_feature_handler, None)
 		self._send(msg)
 
 	def has_protocol_feature(self, feat):
@@ -109,8 +119,8 @@ class access80211(object):
 	##
 	# Allocates a netlink message setup with genl header for nl80211 family.
 	def alloc_genlmsg(self, cmd, flags=0):
-		msg = nlc.Message()
-		genl.genlmsg_put(msg._msg, 0, 0, self._family, 0, flags, cmd, 0)
+		msg = Message()
+		genlmsg_put(msg._msg, 0, 0, self._family, 0, flags, cmd, 0)
 		return msg
 
 	##
@@ -122,7 +132,7 @@ class access80211(object):
 		if self.busy == 1:
 			raise AccessBusyError()
 		self.busy = 1
-		self._rx_cb.set_type(nl.NL_CB_VALID, nl.NL_CB_CUSTOM, handler.handle, None)
+		self._rx_cb.set_type(NL_CB_VALID, NL_CB_CUSTOM, handler.handle, None)
 		self._send(msg)
 
 	def _send(self, msg):
@@ -139,32 +149,32 @@ class access80211(object):
 	##
 	# Function effectively disables sequence number check.
 	def noseq(self, m, a):
-		return nl.NL_OK
+		return NL_OK
 
 	##
 	# Disable sequence number checking, which is required for receiving
 	# multicast notifications.
 	def disable_seq_check(self):
-		self._rx_cb.set_type(nl.NL_CB_SEQ_CHECK, nl.NL_CB_CUSTOM, self.noseq, None)
+		self._rx_cb.set_type(NL_CB_SEQ_CHECK, NL_CB_CUSTOM, self.noseq, None)
 
 	##
 	# Enable sequence number checking.
 	def enalbe_seq_check(self):
-		self._rx_cb.set_type(nl.NL_CB_SEQ_CHECK, nl.NL_CB_DEFAULT, None, None)
+		self._rx_cb.set_type(NL_CB_SEQ_CHECK, NL_CB_DEFAULT, None, None)
 
 	##
 	# Subscribe to the provided multicast group for notifications.
 	def subscribe_multicast(self, mcname):
-		mcid = genl.genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcname)
-		nl.nl_socket_add_membership(self._sock._sock, mcid)
+		mcid = genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcname)
+		nl_socket_add_membership(self._sock._sock, mcid)
 		return mcid
 
 	##
 	# Unsubscribe from the provided multicast group.
 	def drop_multicast(self, mcid):
 		if isinstance(mcid, str):
-			mcid = genl.genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcid)
-		nl.nl_socket_drop_membership(self._sock._sock, mcid)
+			mcid = genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcid)
+		nl_socket_drop_membership(self._sock._sock, mcid)
 
 	##
 	# Property (GET) for obtaining the generic netlink family.
@@ -177,19 +187,19 @@ class access80211(object):
 	# stop receiving and return.
 	def finish_handler(self, m, a):
 		self.busy = 0
-		return nl.NL_SKIP
+		return NL_SKIP
 
 	##
 	# Defaul ack handler.
 	def ack_handler(self, m, a):
 		self.busy = 0
-		return nl.NL_STOP
+		return NL_STOP
 
 	##
 	# Default error handler passing error value in busy flag.
 	def error_handler(self, err, a):
 		self.busy = err.error
-		return nl.NL_STOP
+		return NL_STOP
 
 ##
 # main object which deals with storing the attributes converting them to
@@ -211,20 +221,20 @@ class nl80211_object(object):
 		try:
 			if aid in self.nest_attr_map.keys():
 				(nest_class, max_nest, nest_policy) = self.nest_attr_map[aid]
-			e, nattr = nl.py_nla_parse_nested(max_nest, attr, nest_policy)
+			e, nattr = py_nla_parse_nested(max_nest, attr, nest_policy)
 			return factory.get_inst().create(nest_class, nattr, nest_policy)
 		except Exception as e:
-			return nl.nla_type(attr)
+			return nla_type(attr)
 
 	##
 	# Creates a nested attribute list adding a new instance
 	# for each nested element.
 	def create_nested_list(self, attr_list, aid):
 		nest_list = []
-		for nest_element in nl.nla_get_nested(attr_list):
+		for nest_element in nla_get_nested(attr_list):
 			nest_obj = self.create_nested(nest_element, aid)
 			if isinstance(nest_obj, nl80211_object):
-				nest_obj.nla_type = nl.nla_type(nest_element)
+				nest_obj.nla_type = nla_type(nest_element)
 			nest_list.append(nest_obj)
 		return nest_list
 
@@ -233,17 +243,17 @@ class nl80211_object(object):
 	def create_list(self, attr_list, pol):
 		nest_list = []
 		item_type = pol.list_type
-		for item in nl.nla_get_nested(attr_list):
+		for item in nla_get_nested(attr_list):
 			if item_type == NLA_NUL_STRING:
-				nest_obj = nl.nla_get_string(item)
-			elif item_type == nl.NLA_U64:
-				nest_obj = nl.nla_get_u64(item)
-			elif item_type == nl.NLA_U32:
-				nest_obj = nl.nla_get_u32(item)
-			elif item_type == nl.NLA_U16:
-				nest_obj = nl.nla_get_u16(item)
-			elif item_type == nl.NLA_U8:
-				nest_obj = nl.nla_get_u8(item)
+				nest_obj = nla_get_string(item)
+			elif item_type == NLA_U64:
+				nest_obj = nla_get_u64(item)
+			elif item_type == NLA_U32:
+				nest_obj = nla_get_u32(item)
+			elif item_type == NLA_U16:
+				nest_obj = nla_get_u16(item)
+			elif item_type == NLA_U8:
+				nest_obj = nla_get_u8(item)
 			else:
 				raise Exception("type (%d) not supported for list" % item_type)
 			nest_list.append(nest_obj)
@@ -251,10 +261,10 @@ class nl80211_object(object):
 
 	def create_map(self, map_attr, pol):
 		nest_map = {}
-		for key in nl.nla_get_nested(map_attr):
+		for key in nla_get_nested(map_attr):
 			nest_list = self.create_list(key, pol)
 			if len(nest_list) > 0:
-				nest_map[nl.nla_type(key)] = nest_list
+				nest_map[nla_type(key)] = nest_list
 		return nest_map
 
 	##
@@ -262,18 +272,18 @@ class nl80211_object(object):
 	# which may be a list of values.
 	def convert_sign(self, attr, pol):
 		conv_tab = {
-			nl.NLA_U64: 0x8000000000000000,
-			nl.NLA_U32: 0x80000000,
-			nl.NLA_U16: 0x8000,
-			nl.NLA_U8: 0x80
+			NLA_U64: 0x8000000000000000,
+			NLA_U32: 0x80000000,
+			NLA_U16: 0x8000,
+			NLA_U8: 0x80
 		}
 		pol_type = pol.type
-		if pol.type == nl.NLA_NESTED:
+		if pol.type == NLA_NESTED:
 			pol_type = pol.list_type
 		if not pol_type in conv_tab:
 			raise Exception("invalid type (%d) for sign conversion" % pol_type)
 		conv_check = conv_tab[pol_type]
-		if pol.type != nl.NLA_NESTED:
+		if pol.type != NLA_NESTED:
 			if attr & conv_check:
 				return -conv_check + (attr & (conv_check - 1))
 		else:
@@ -314,31 +324,31 @@ class nl80211_object(object):
 			try:
 				pol = self._policy[aid]
 				if pol.type == NLA_S8:
-					pol.type = nl.NLA_U8
+					pol.type = NLA_U8
 					pol.signed = True
 				elif pol.type == NLA_S16:
-					pol.type = nl.NLA_U16
+					pol.type = NLA_U16
 					pol.signed = True
 				elif pol.type == NLA_S32:
-					pol.type = nl.NLA_U32
+					pol.type = NLA_U32
 					pol.signed = True
 				elif pol.type == NLA_S64:
-					pol.type = nl.NLA_U64
+					pol.type = NLA_U64
 					pol.signed = True
 
 				if pol.type == NLA_NUL_STRING:
-					self._attrs[aid] = nl.nla_get_string(attrs[aid])
-				elif pol.type == nl.NLA_U64:
-					self._attrs[aid] = nl.nla_get_u64(attrs[aid])
-				elif pol.type == nl.NLA_U32:
-					self._attrs[aid] = nl.nla_get_u32(attrs[aid])
-				elif pol.type == nl.NLA_U16:
-					self._attrs[aid] = nl.nla_get_u16(attrs[aid])
-				elif pol.type == nl.NLA_U8:
-					self._attrs[aid] = nl.nla_get_u8(attrs[aid])
-				elif pol.type == nl.NLA_FLAG:
+					self._attrs[aid] = nla_get_string(attrs[aid])
+				elif pol.type == NLA_U64:
+					self._attrs[aid] = nla_get_u64(attrs[aid])
+				elif pol.type == NLA_U32:
+					self._attrs[aid] = nla_get_u32(attrs[aid])
+				elif pol.type == NLA_U16:
+					self._attrs[aid] = nla_get_u16(attrs[aid])
+				elif pol.type == NLA_U8:
+					self._attrs[aid] = nla_get_u8(attrs[aid])
+				elif pol.type == NLA_FLAG:
 					self._attrs[aid] = True
-				elif pol.type == nl.NLA_NESTED:
+				elif pol.type == NLA_NESTED:
 					if hasattr(pol, 'single') and pol.single:
 						obj = self.create_nested(attrs[aid], aid)
 					elif hasattr(pol, 'map') and pol.map:
@@ -350,13 +360,13 @@ class nl80211_object(object):
 					else:
 						obj = self.create_nested_list(attrs[aid], aid)
 					self.merge_nested_attrs(aid, obj)
-				elif pol.type in [ NLA_BINARY, nl.NLA_UNSPEC ]:
-					self._attrs[aid] = nl.nla_data(attrs[aid])
+				elif pol.type in [ NLA_BINARY, NLA_UNSPEC ]:
+					self._attrs[aid] = nla_data(attrs[aid])
 				if hasattr(pol, 'signed') and pol.signed:
 					self._attrs[aid] = self.convert_sign(self._attrs[aid], pol)
 			except Exception as e:
 				print e.message
-				self._attrs[aid] = nl.nla_data(attrs[aid])
+				self._attrs[aid] = nla_data(attrs[aid])
 		self.post_store_attrs(attrs)
 
 	##
@@ -396,7 +406,7 @@ class nl80211_managed_object(nl80211_object, custom_handler):
 	##
 	# Refresh object data by sending a new netlink message to the kernel.
 	def refresh(self):
-		m = self._access.alloc_genlmsg(self.objcmd, nlc.NLM_F_REQUEST | nlc.NLM_F_ACK)
+		m = self._access.alloc_genlmsg(self.objcmd, NLM_F_REQUEST | NLM_F_ACK)
 		self.put_obj_id(m)
 		self._access.send(m, self)
 
@@ -404,16 +414,16 @@ class nl80211_managed_object(nl80211_object, custom_handler):
 	# Valid handler parsing the response(s) and store the attributes.
 	def handle(self, msg, arg):
 		try:
-			e, attrs = genl.py_genlmsg_parse(nl.nlmsg_hdr(msg), 0, nl80211.ATTR_MAX, None)
+			e, attrs = py_genlmsg_parse(nlmsg_hdr(msg), 0, nl80211.ATTR_MAX, None)
 			self.store_attrs(attrs)
-			return nl.NL_SKIP
+			return NL_SKIP
 		except Exception as e:
 			(t,v,tb) = sys.exc_info()
 			print v.message
 			traceback.print_tb(tb)
 
 class nl80211_cmd_base(custom_handler):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		self._access = access80211(level)
 		self._cmd = None
 		self._ifidx = ifidx
@@ -424,11 +434,11 @@ class nl80211_cmd_base(custom_handler):
 		if self._cmd == None:
 			raise Exception("sub-class must set _cmd")
 
-		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK
+		flags = NLM_F_REQUEST | NLM_F_ACK
 		self._nl_msg = self._access.alloc_genlmsg(self._cmd, flags)
 
 	def _add_attrs(self):
-		nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+		nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
 
 	def nl_msg(self):
 		self._prepare_cmd()

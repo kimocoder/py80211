@@ -19,37 +19,44 @@
 import sys
 import traceback
 
-import netlink.capi as nl
-import netlink.core as nlc
-import netlink.genl.capi as genl
+from netlink.capi import (nla_policy_array, NLA_U64, NLA_U32, NLA_U16, NLA_U8,
+			  NLA_UNSPEC, NLA_FLAG,
+			  NL_CB_DEFAULT,
+			  nla_put, nla_put_u32,
+			  nlmsg_hdr, py_nla_parse_nested,
+			  NL_SKIP,
+			  nla_nest_start, nla_nest_end)
+from netlink.core import NLM_F_REQUEST, NLM_F_ACK, NLM_F_DUMP
+from netlink.genl.capi import genlmsg_hdr, py_genlmsg_parse
+
 import generated.defs as nl80211
 
 from generated.policy import nl80211_policy
 from base import *
 import factory
 
-bss_policy = nl.nla_policy_array(nl80211.BSS_MAX + 1)
-bss_policy[nl80211.BSS_TSF].type = nl.NLA_U64
-bss_policy[nl80211.BSS_FREQUENCY].type = nl.NLA_U32
-bss_policy[nl80211.BSS_BSSID].type = nl.NLA_UNSPEC
-bss_policy[nl80211.BSS_BEACON_INTERVAL].type = nl.NLA_U16
-bss_policy[nl80211.BSS_CAPABILITY].type = nl.NLA_U16
-bss_policy[nl80211.BSS_INFORMATION_ELEMENTS].type = nl.NLA_UNSPEC
-bss_policy[nl80211.BSS_SIGNAL_MBM].type = nl.NLA_U32
+bss_policy = nla_policy_array(nl80211.BSS_MAX + 1)
+bss_policy[nl80211.BSS_TSF].type = NLA_U64
+bss_policy[nl80211.BSS_FREQUENCY].type = NLA_U32
+bss_policy[nl80211.BSS_BSSID].type = NLA_UNSPEC
+bss_policy[nl80211.BSS_BEACON_INTERVAL].type = NLA_U16
+bss_policy[nl80211.BSS_CAPABILITY].type = NLA_U16
+bss_policy[nl80211.BSS_INFORMATION_ELEMENTS].type = NLA_UNSPEC
+bss_policy[nl80211.BSS_SIGNAL_MBM].type = NLA_U32
 bss_policy[nl80211.BSS_SIGNAL_MBM].signed = True
-bss_policy[nl80211.BSS_SIGNAL_UNSPEC].type = nl.NLA_U8
-bss_policy[nl80211.BSS_STATUS].type = nl.NLA_U32
-bss_policy[nl80211.BSS_SEEN_MS_AGO].type = nl.NLA_U32
-bss_policy[nl80211.BSS_BEACON_IES].type = nl.NLA_UNSPEC
-bss_policy[nl80211.BSS_BEACON_TSF].type = nl.NLA_U64
-bss_policy[nl80211.BSS_CHAN_WIDTH].type = nl.NLA_U32
-bss_policy[nl80211.BSS_PRESP_DATA].type = nl.NLA_FLAG
+bss_policy[nl80211.BSS_SIGNAL_UNSPEC].type = NLA_U8
+bss_policy[nl80211.BSS_STATUS].type = NLA_U32
+bss_policy[nl80211.BSS_SEEN_MS_AGO].type = NLA_U32
+bss_policy[nl80211.BSS_BEACON_IES].type = NLA_UNSPEC
+bss_policy[nl80211.BSS_BEACON_TSF].type = NLA_U64
+bss_policy[nl80211.BSS_CHAN_WIDTH].type = NLA_U32
+bss_policy[nl80211.BSS_PRESP_DATA].type = NLA_FLAG
 
 class bss(nl80211_object):
 	pass
 
 class bss_list(custom_handler):
-	def __init__(self, ifidx, kind=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, kind=NL_CB_DEFAULT):
 		self._access = access80211(kind)
 		self._ifidx = ifidx
 		self.refresh()
@@ -66,26 +73,26 @@ class bss_list(custom_handler):
 
 	def refresh(self):
 		self._bss = []
-		flags = nlc.NLM_F_REQUEST | nlc.NLM_F_ACK | nlc.NLM_F_DUMP
+		flags = NLM_F_REQUEST | NLM_F_ACK | NLM_F_DUMP
 		m = self._access.alloc_genlmsg(nl80211.CMD_GET_SCAN, flags)
-		nl.nla_put_u32(m._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+		nla_put_u32(m._msg, nl80211.ATTR_IFINDEX, self._ifidx)
 		self._access.send(m, self)
 
 	def handle(self, msg, arg):
 		try:
-			e, attrs = genl.py_genlmsg_parse(nl.nlmsg_hdr(msg), 0, nl80211.ATTR_MAX, None)
+			e, attrs = py_genlmsg_parse(nlmsg_hdr(msg), 0, nl80211.ATTR_MAX, None)
 			if not nl80211.ATTR_BSS in attrs:
 				return
-			e, nattrs = nl.py_nla_parse_nested(len(bss_policy), attrs[nl80211.ATTR_BSS], bss_policy)
+			e, nattrs = py_nla_parse_nested(len(bss_policy), attrs[nl80211.ATTR_BSS], bss_policy)
 			self._bss.append(factory.get_inst().create(bss, nattrs, bss_policy))
 		except Exception as e:
 			(t,v,tb) = sys.exc_info()
 			print v.message
 			traceback.print_tb(tb)
-		return nl.NL_SKIP
+		return NL_SKIP
 
 class scan_cmd_base(nl80211_cmd_base):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		super(scan_cmd_base, self).__init__(ifidx, level)
 
 	def _wait_for_completion(self):
@@ -109,7 +116,7 @@ class scan_cmd_base(nl80211_cmd_base):
 		self._send_and_wait()
 
 class scan_start_base(scan_cmd_base):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		super(scan_start_base, self).__init__(ifidx, level)
 		self._ssids = None
 		self._freqs = None
@@ -120,22 +127,22 @@ class scan_start_base(scan_cmd_base):
 		super(scan_start_base, self)._add_attrs()
 		if self._ssids:
 			i = 0
-			nest = nl.nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_SSIDS)
+			nest = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_SSIDS)
 			for ssid in self._ssids:
-				nl.nla_put(self._nl_msg._msg, i, ssid)
+				nla_put(self._nl_msg._msg, i, ssid)
 				i += 1
-			nl.nla_nest_end(self._nl_msg._msg, nest)
+			nla_nest_end(self._nl_msg._msg, nest)
 		if self._freqs:
 			i = 0
-			nest = nl.nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_FREQUENCIES)
+			nest = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_FREQUENCIES)
 			for freq in self._freqs:
-				nl.nla_put_u32(self._nl_msg._msg, i, freq)
+				nla_put_u32(self._nl_msg._msg, i, freq)
 				i += 1
-			nl.nla_nest_end(self._nl_msg._msg, nest)
+			nla_nest_end(self._nl_msg._msg, nest)
 		if self._flags != 0:
-			nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCAN_FLAGS, self._flags)
+			nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCAN_FLAGS, self._flags)
 		if self._ies:
-			nl.nla_put(self._nl_msg._msg, nl80211.ATTR_IE, self._ies)
+			nla_put(self._nl_msg._msg, nl80211.ATTR_IE, self._ies)
 
 	def add_ssids(self, ssids):
 		if self._ssids == None:
@@ -160,20 +167,20 @@ class scan_start_base(scan_cmd_base):
 		self._flags = flags
 
 class scan_request(scan_start_base):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		super(scan_request, self).__init__(ifidx, level)
 		self._cmd = nl80211.CMD_TRIGGER_SCAN
 
 	def handle(self, msg, arg):
-		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
+		genlh = genlmsg_hdr(nlmsg_hdr(msg))
 
 		# A regular scan is complete when we get scan results
 		if genlh.cmd in [ nl80211.CMD_SCAN_ABORTED, nl80211.CMD_NEW_SCAN_RESULTS ]:
 			self.scan_busy = False
-		return nl.NL_SKIP
+		return NL_SKIP
 
 class sched_scan_start(scan_start_base):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		super(sched_scan_start, self).__init__(ifidx, level)
 		self._cmd = nl80211.CMD_START_SCHED_SCAN
 		self._interval = None
@@ -189,37 +196,37 @@ class sched_scan_start(scan_start_base):
 		if self._matches:
 			i = 0
 
-			matchset = nl.nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_MATCH)
+			matchset = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_MATCH)
 			for match in self._matches:
-				nest = nl.nla_nest_start(self._nl_msg._msg, i)
+				nest = nla_nest_start(self._nl_msg._msg, i)
 				if 'ssid' in match:
-					nl.nla_put(self._nl_msg._msg, nl80211.SCHED_SCAN_MATCH_ATTR_SSID, match['ssid'])
+					nla_put(self._nl_msg._msg, nl80211.SCHED_SCAN_MATCH_ATTR_SSID, match['ssid'])
 				i += 1
-				nl.nla_nest_end(self._nl_msg._msg, nest)
+				nla_nest_end(self._nl_msg._msg, nest)
 
-			nl.nla_nest_end(self._nl_msg._msg, matchset)
+			nla_nest_end(self._nl_msg._msg, matchset)
 
 	def _add_attrs(self):
 		super(sched_scan_start, self)._add_attrs()
 		self._add_matches_attrs()
 		if self._interval != None:
-			nl.nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
+			nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
 
 	def handle(self, msg, arg):
-		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
+		genlh = genlmsg_hdr(nlmsg_hdr(msg))
 
 		# A schedule scan is complete immediately when it gets started
 		if genlh.cmd in [ nl80211.CMD_START_SCHED_SCAN ]:
 			self.scan_busy = False
-		return nl.NL_SKIP
+		return NL_SKIP
 
 class sched_scan_stop(scan_cmd_base):
-	def __init__(self, ifidx, level=nl.NL_CB_DEFAULT):
+	def __init__(self, ifidx, level=NL_CB_DEFAULT):
 		super(sched_scan_stop, self).__init__(ifidx, level)
 		self._cmd = nl80211.CMD_STOP_SCHED_SCAN
 
 	def handle(self, msg, arg):
-		genlh = genl.genlmsg_hdr(nl.nlmsg_hdr(msg))
+		genlh = genlmsg_hdr(nlmsg_hdr(msg))
 		if genlh.cmd in [ nl80211.CMD_SCHED_SCAN_STOPPED ]:
 			self.scan_busy = False
-		return nl.NL_SKIP
+		return NL_SKIP
