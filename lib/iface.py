@@ -41,7 +41,7 @@ class interface(nl80211_managed_object):
 		return self._wdevid
 
 	def put_obj_id(self, msg):
-		nla_put_u64(msg._msg, nl80211.ATTR_WDEV, self._wdevid)
+		nla_put_u64(msg, nl80211.ATTR_WDEV, self._wdevid)
 
 class interface_list(custom_handler):
 	def __init__(self, access=None, kind=NL_CB_DEFAULT):

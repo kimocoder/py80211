@@ -29,11 +29,12 @@ from netlink.capi import (NL_CB_DEFAULT, NL_CB_FINISH, NL_CB_ACK, NL_CB_CUSTOM,
 			  nlmsg_hdr, py_nla_parse_nested, nla_type,
 			  nla_get_nested, nla_get_string, nla_get_u64,
 			  nla_get_u32, nla_get_u16, nla_get_u8,
-			  nla_data, nla_put_u32)
+			  nla_data, nla_put_u32, nl_cb_alloc, py_nl_cb_set,
+			  py_nl_cb_err, nl_connect, nl_send_auto_complete,
+			  nl_recvmsgs, nl_socket_alloc_cb, nlmsg_alloc)
 from netlink.genl.capi import (genlmsg_hdr, genl_ctrl_resolve, py_genlmsg_parse,
 			       genlmsg_put, genl_ctrl_resolve_grp)
-from netlink.core import (Callback, Socket, Message, NETLINK_GENERIC,
-			  NLM_F_REQUEST, NLM_F_ACK)
+from netlink.core import (NETLINK_GENERIC, NLM_F_REQUEST, NLM_F_ACK)
 
 import generated.defs as nl80211
 from generated import strmap
@@ -57,7 +58,7 @@ class AccessBusyError(Exception):
 # error.
 class CommandFailedError(Exception):
 	def __init__(self, msg, errno):
-		self._cmd = genlmsg_hdr(msg.hdr).cmd
+		self._cmd = genlmsg_hdr(nlmsg_hdr(msg)).cmd
 		self._errno = errno
 
 	def __str__(self):
@@ -78,16 +79,16 @@ class custom_handler(object):
 class access80211(object):
 	""" provide access to the nl80211 API """
 	def __init__(self, level=NL_CB_DEFAULT):
-		self._tx_cb = Callback(level)
-		self._rx_cb = Callback(level)
-		self._sock = Socket(self._tx_cb)
+		self._tx_cb = nl_cb_alloc(level)
+		self._rx_cb = nl_cb_alloc(level)
+		self._sock = nl_socket_alloc_cb(self._tx_cb)
 
-		self._rx_cb.set_err(NL_CB_CUSTOM, self.error_handler, None)
-		self._rx_cb.set_type(NL_CB_FINISH, NL_CB_CUSTOM, self.finish_handler, None)
-		self._rx_cb.set_type(NL_CB_ACK, NL_CB_CUSTOM, self.ack_handler, None)
+		py_nl_cb_err(self._rx_cb, NL_CB_CUSTOM, self.error_handler, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_FINISH, NL_CB_CUSTOM, self.finish_handler, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_ACK, NL_CB_CUSTOM, self.ack_handler, None)
 
-		self._sock.connect(NETLINK_GENERIC)
-		self._family = genl_ctrl_resolve(self._sock._sock, 'nl80211')
+		nl_connect(self._sock, NETLINK_GENERIC)
+		self._family = genl_ctrl_resolve(self._sock, 'nl80211')
 		self._get_protocol_features()
 
 	def _protocol_feature_handler(self, m, a):
@@ -108,7 +109,7 @@ class access80211(object):
 	def _get_protocol_features(self):
 		msg = self.alloc_genlmsg(nl80211.CMD_GET_PROTOCOL_FEATURES)
 		self.busy = 1
-		self._rx_cb.set_type(NL_CB_VALID, NL_CB_CUSTOM, self._protocol_feature_handler, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_VALID, NL_CB_CUSTOM, self._protocol_feature_handler, None)
 		self._send(msg)
 
 	def has_protocol_feature(self, feat):
@@ -119,8 +120,8 @@ class access80211(object):
 	##
 	# Allocates a netlink message setup with genl header for nl80211 family.
 	def alloc_genlmsg(self, cmd, flags=0):
-		msg = Message()
-		genlmsg_put(msg._msg, 0, 0, self._family, 0, flags, cmd, 0)
+		msg = nlmsg_alloc()
+		genlmsg_put(msg, 0, 0, self._family, 0, flags, cmd, 0)
 		return msg
 
 	##
@@ -132,14 +133,14 @@ class access80211(object):
 		if self.busy == 1:
 			raise AccessBusyError()
 		self.busy = 1
-		self._rx_cb.set_type(NL_CB_VALID, NL_CB_CUSTOM, handler.handle, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_VALID, NL_CB_CUSTOM, handler.handle, None)
 		self._send(msg)
 
 	def _send(self, msg):
 		try:
-			self._sock.send_auto_complete(msg)
+			nl_send_auto_complete(self._sock, msg)
 			while self.busy > 0:
-				self._sock.recvmsgs(self._rx_cb)
+				nl_recvmsgs(self._sock, self._rx_cb)
 		except Exception as e:
 			if self.busy > 0:
 				raise e
@@ -155,26 +156,26 @@ class access80211(object):
 	# Disable sequence number checking, which is required for receiving
 	# multicast notifications.
 	def disable_seq_check(self):
-		self._rx_cb.set_type(NL_CB_SEQ_CHECK, NL_CB_CUSTOM, self.noseq, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_SEQ_CHECK, NL_CB_CUSTOM, self.noseq, None)
 
 	##
 	# Enable sequence number checking.
 	def enalbe_seq_check(self):
-		self._rx_cb.set_type(NL_CB_SEQ_CHECK, NL_CB_DEFAULT, None, None)
+		py_nl_cb_set(self._rx_cb, NL_CB_SEQ_CHECK, NL_CB_DEFAULT, None, None)
 
 	##
 	# Subscribe to the provided multicast group for notifications.
 	def subscribe_multicast(self, mcname):
-		mcid = genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcname)
-		nl_socket_add_membership(self._sock._sock, mcid)
+		mcid = genl_ctrl_resolve_grp(self._sock, 'nl80211', mcname)
+		nl_socket_add_membership(self._sock, mcid)
 		return mcid
 
 	##
 	# Unsubscribe from the provided multicast group.
 	def drop_multicast(self, mcid):
 		if isinstance(mcid, str):
-			mcid = genl_ctrl_resolve_grp(self._sock._sock, 'nl80211', mcid)
-		nl_socket_drop_membership(self._sock._sock, mcid)
+			mcid = genl_ctrl_resolve_grp(self._sock, 'nl80211', mcid)
+		nl_socket_drop_membership(self._sock, mcid)
 
 	##
 	# Property (GET) for obtaining the generic netlink family.
@@ -438,7 +439,7 @@ class nl80211_cmd_base(custom_handler):
 		self._nl_msg = self._access.alloc_genlmsg(self._cmd, flags)
 
 	def _add_attrs(self):
-		nla_put_u32(self._nl_msg._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+		nla_put_u32(self._nl_msg, nl80211.ATTR_IFINDEX, self._ifidx)
 
 	def nl_msg(self):
 		self._prepare_cmd()

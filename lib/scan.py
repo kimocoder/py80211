@@ -75,7 +75,7 @@ class bss_list(custom_handler):
 		self._bss = []
 		flags = NLM_F_REQUEST | NLM_F_ACK | NLM_F_DUMP
 		m = self._access.alloc_genlmsg(nl80211.CMD_GET_SCAN, flags)
-		nla_put_u32(m._msg, nl80211.ATTR_IFINDEX, self._ifidx)
+		nla_put_u32(m, nl80211.ATTR_IFINDEX, self._ifidx)
 		self._access.send(m, self)
 
 	def handle(self, msg, arg):
@@ -127,22 +127,22 @@ class scan_start_base(scan_cmd_base):
 		super(scan_start_base, self)._add_attrs()
 		if self._ssids:
 			i = 0
-			nest = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_SSIDS)
+			nest = nla_nest_start(self._nl_msg, nl80211.ATTR_SCAN_SSIDS)
 			for ssid in self._ssids:
-				nla_put(self._nl_msg._msg, i, ssid)
+				nla_put(self._nl_msg, i, ssid)
 				i += 1
-			nla_nest_end(self._nl_msg._msg, nest)
+			nla_nest_end(self._nl_msg, nest)
 		if self._freqs:
 			i = 0
-			nest = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCAN_FREQUENCIES)
+			nest = nla_nest_start(self._nl_msg, nl80211.ATTR_SCAN_FREQUENCIES)
 			for freq in self._freqs:
-				nla_put_u32(self._nl_msg._msg, i, freq)
+				nla_put_u32(self._nl_msg, i, freq)
 				i += 1
-			nla_nest_end(self._nl_msg._msg, nest)
+			nla_nest_end(self._nl_msg, nest)
 		if self._flags != 0:
-			nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCAN_FLAGS, self._flags)
+			nla_put_u32(self._nl_msg, nl80211.ATTR_SCAN_FLAGS, self._flags)
 		if self._ies:
-			nla_put(self._nl_msg._msg, nl80211.ATTR_IE, self._ies)
+			nla_put(self._nl_msg, nl80211.ATTR_IE, self._ies)
 
 	def add_ssids(self, ssids):
 		if self._ssids == None:
@@ -196,21 +196,21 @@ class sched_scan_start(scan_start_base):
 		if self._matches:
 			i = 0
 
-			matchset = nla_nest_start(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_MATCH)
+			matchset = nla_nest_start(self._nl_msg, nl80211.ATTR_SCHED_SCAN_MATCH)
 			for match in self._matches:
-				nest = nla_nest_start(self._nl_msg._msg, i)
+				nest = nla_nest_start(self._nl_msg, i)
 				if 'ssid' in match:
-					nla_put(self._nl_msg._msg, nl80211.SCHED_SCAN_MATCH_ATTR_SSID, match['ssid'])
+					nla_put(self._nl_msg, nl80211.SCHED_SCAN_MATCH_ATTR_SSID, match['ssid'])
 				i += 1
-				nla_nest_end(self._nl_msg._msg, nest)
+				nla_nest_end(self._nl_msg, nest)
 
-			nla_nest_end(self._nl_msg._msg, matchset)
+			nla_nest_end(self._nl_msg, matchset)
 
 	def _add_attrs(self):
 		super(sched_scan_start, self)._add_attrs()
 		self._add_matches_attrs()
 		if self._interval != None:
-			nla_put_u32(self._nl_msg._msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
+			nla_put_u32(self._nl_msg, nl80211.ATTR_SCHED_SCAN_INTERVAL, self._interval)
 
 	def handle(self, msg, arg):
 		genlh = genlmsg_hdr(nlmsg_hdr(msg))

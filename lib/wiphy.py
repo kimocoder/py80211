@@ -154,7 +154,7 @@ class wiphy_list(custom_handler):
 			flags |= NLM_F_DUMP
 		m = a.alloc_genlmsg(nl80211.CMD_GET_WIPHY, flags)
 		if split_wiphy:
-			nla_put_flag(m._msg, nl80211.ATTR_SPLIT_WIPHY_DUMP)
+			nla_put_flag(m, nl80211.ATTR_SPLIT_WIPHY_DUMP)
 		self._access = a
 		a.send(m, self)
 
