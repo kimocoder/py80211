@@ -2,7 +2,7 @@
 # This file is generated using extract.py using pycparser
 ###########################################################
 # revision:
-#	v4.12.7
+#	v4.15.15
 ###########################################################
 from netlink.capi import *
 from defs import *
@@ -368,6 +368,13 @@ nl80211_nan_srf_policy[NAN_SRF_BF].type = NLA_BINARY
 nl80211_nan_srf_policy[NAN_SRF_BF].max_len = 0xff
 nl80211_nan_srf_policy[NAN_SRF_BF_IDX].type = NLA_U8
 nl80211_nan_srf_policy[NAN_SRF_MAC_ADDRS].type = NLA_NESTED
+#
+# policy: nl80211_packet_pattern_policy
+#
+nl80211_packet_pattern_policy = nla_policy_array(MAX_NL80211_PKTPAT + 1)
+nl80211_packet_pattern_policy[PKTPAT_MASK].type = NLA_BINARY
+nl80211_packet_pattern_policy[PKTPAT_PATTERN].type = NLA_BINARY
+nl80211_packet_pattern_policy[PKTPAT_OFFSET].type = NLA_U32
 #
 # policy: txq_params_policy
 #
