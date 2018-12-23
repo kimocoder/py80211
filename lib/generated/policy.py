@@ -2,7 +2,7 @@
 # This file is generated using extract.py using pycparser
 ###########################################################
 # revision:
-#	v4.11.3
+#	v4.15.15
 ###########################################################
 from netlink.capi import *
 from defs import *
@@ -97,8 +97,7 @@ nl80211_policy[ATTR_CIPHER_SUITE_GROUP].type = NLA_U32
 nl80211_policy[ATTR_WPA_VERSIONS].type = NLA_U32
 nl80211_policy[ATTR_PID].type = NLA_U32
 nl80211_policy[ATTR_4ADDR].type = NLA_U8
-nl80211_policy[ATTR_PMKID].type = NLA_BINARY
-nl80211_policy[ATTR_PMKID].max_len = 16
+nl80211_policy[ATTR_PMKID].min_len = 16
 nl80211_policy[ATTR_DURATION].type = NLA_U32
 nl80211_policy[ATTR_COOKIE].type = NLA_U64
 nl80211_policy[ATTR_TX_RATES].type = NLA_NESTED
@@ -152,6 +151,7 @@ nl80211_policy[ATTR_VHT_CAPABILITY].min_len = 12
 nl80211_policy[ATTR_SCAN_FLAGS].type = NLA_U32
 nl80211_policy[ATTR_P2P_CTWINDOW].type = NLA_U8
 nl80211_policy[ATTR_P2P_OPPPS].type = NLA_U8
+nl80211_policy[ATTR_LOCAL_MESH_POWER_MODE].type = NLA_U32
 nl80211_policy[ATTR_ACL_POLICY].type = NLA_U32
 nl80211_policy[ATTR_MAC_ADDRS].type = NLA_NESTED
 nl80211_policy[ATTR_STA_CAPABILITY].type = NLA_U16
@@ -208,6 +208,17 @@ nl80211_policy[ATTR_BSSID].min_len = 6
 nl80211_policy[ATTR_SCHED_SCAN_RELATIVE_RSSI].type = NLA_S8
 nl80211_policy[ATTR_SCHED_SCAN_RSSI_ADJUST].min_len = None
 nl80211_policy[ATTR_TIMEOUT_REASON].type = NLA_U32
+nl80211_policy[ATTR_FILS_ERP_USERNAME].type = NLA_BINARY
+nl80211_policy[ATTR_FILS_ERP_USERNAME].max_len = 16
+nl80211_policy[ATTR_FILS_ERP_REALM].type = NLA_BINARY
+nl80211_policy[ATTR_FILS_ERP_REALM].max_len = 253
+nl80211_policy[ATTR_FILS_ERP_NEXT_SEQ_NUM].type = NLA_U16
+nl80211_policy[ATTR_FILS_ERP_RRK].type = NLA_BINARY
+nl80211_policy[ATTR_FILS_ERP_RRK].max_len = 64
+nl80211_policy[ATTR_FILS_CACHE_ID].min_len = 2
+nl80211_policy[ATTR_PMK].type = NLA_BINARY
+nl80211_policy[ATTR_PMK].max_len = 48
+nl80211_policy[ATTR_SCHED_SCAN_MULTI].type = NLA_FLAG
 # append/override nl80211_policy entries
 nl80211_policy[ATTR_GENERATION].type = NLA_U32
 nl80211_policy[ATTR_MAX_NUM_SCAN_SSIDS].type = NLA_U8
@@ -310,6 +321,7 @@ nl80211_rekey_policy[REKEY_DATA_REPLAY_CTR].min_len = 8
 nl80211_match_policy = nla_policy_array(SCHED_SCAN_MATCH_ATTR_MAX + 1)
 nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_SSID].type = NLA_BINARY
 nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_SSID].max_len = 32
+nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_BSSID].min_len = 6
 nl80211_match_policy[SCHED_SCAN_MATCH_ATTR_RSSI].type = NLA_U32
 #
 # policy: nl80211_plan_policy
@@ -331,8 +343,7 @@ nl80211_bss_select_policy[BSS_SELECT_ATTR_RSSI_ADJUST].min_len = 2
 #
 nl80211_nan_func_policy = nla_policy_array(NAN_FUNC_ATTR_MAX + 1)
 nl80211_nan_func_policy[NAN_FUNC_TYPE].type = NLA_U8
-nl80211_nan_func_policy[NAN_FUNC_SERVICE_ID].type = NLA_BINARY
-nl80211_nan_func_policy[NAN_FUNC_SERVICE_ID].max_len = 6
+nl80211_nan_func_policy[NAN_FUNC_SERVICE_ID].min_len = 6
 nl80211_nan_func_policy[NAN_FUNC_PUBLISH_TYPE].type = NLA_U8
 nl80211_nan_func_policy[NAN_FUNC_PUBLISH_BCAST].type = NLA_FLAG
 nl80211_nan_func_policy[NAN_FUNC_SUBSCRIBE_ACTIVE].type = NLA_FLAG
@@ -357,6 +368,13 @@ nl80211_nan_srf_policy[NAN_SRF_BF].type = NLA_BINARY
 nl80211_nan_srf_policy[NAN_SRF_BF].max_len = 0xff
 nl80211_nan_srf_policy[NAN_SRF_BF_IDX].type = NLA_U8
 nl80211_nan_srf_policy[NAN_SRF_MAC_ADDRS].type = NLA_NESTED
+#
+# policy: nl80211_packet_pattern_policy
+#
+nl80211_packet_pattern_policy = nla_policy_array(MAX_NL80211_PKTPAT + 1)
+nl80211_packet_pattern_policy[PKTPAT_MASK].type = NLA_BINARY
+nl80211_packet_pattern_policy[PKTPAT_PATTERN].type = NLA_BINARY
+nl80211_packet_pattern_policy[PKTPAT_OFFSET].type = NLA_U32
 #
 # policy: txq_params_policy
 #
@@ -464,7 +482,7 @@ reg_rule_policy[ATTR_DFS_CAC_TIME].type = NLA_U32
 # policy: nl80211_attr_cqm_policy
 #
 nl80211_attr_cqm_policy = nla_policy_array(ATTR_CQM_MAX + 1)
-nl80211_attr_cqm_policy[ATTR_CQM_RSSI_THOLD].type = NLA_U32
+nl80211_attr_cqm_policy[ATTR_CQM_RSSI_THOLD].type = NLA_BINARY
 nl80211_attr_cqm_policy[ATTR_CQM_RSSI_HYST].type = NLA_U32
 nl80211_attr_cqm_policy[ATTR_CQM_RSSI_THRESHOLD_EVENT].type = NLA_U32
 nl80211_attr_cqm_policy[ATTR_CQM_TXE_RATE].type = NLA_U32
